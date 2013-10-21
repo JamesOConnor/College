@@ -1,0 +1,82 @@
+
+#Lewis' function for masked arrays
+
+run expressions/lewis
+import masked from masked
+
+#1... Read GlobAlbedo data DHR_SW (shortwave directional-hemispherical reflectance) into a masked array data
+
+data = masked(dataset='DHR_SW')
+
+#load expressions for solar radiation
+
+lat = np.array(nc.variables['lat'])
+
+av_days = 365.25 / 12.
+half = av_days/2.
+N = np.arange(half,365.25,av_days)
+
+h = 0.0
+
+#Generate model shape for rad
+
+N2 = np.array([[N] * data.shape[1]] * data.shape[2]).T
+
+lat2 = np.array([np.array([lat] * data.shape[0]).T] * data.shape[2]).T
+
+#load declination/solar_elevation expressions
+
+run expressions/declination
+run expressions/solar_elevation
+
+h2 = np.zeros_like(N2) + h
+delta = declination(N2.copy())
+e0 = 1360.
+sea = solar_elevation(delta,h2.copy(),lat2.copy())
+sin_theta = np.sin(np.deg2rad(sea))
+rad = e0*sin_theta
+rad[rad < 0] = 0.0
+
+incoming_rad = rad
+
+#2... Generate a spatial Solar Radiation dataset rad of the same shape as data
+
+rad = ma.array(incoming_rad,mask=data.mask)
+
+#3 Calculate the amount of solar radiation absorbed at the surface (W m^-2)
+
+#Amount absorbed = MeanRad - MeanReflectedRad
+
+#initialize mean calculation
+
+not_valid = np.isnan(rad)
+valid = not_valid == False
+ndata = rad[valid]
+
+Meanrad = rad[valid].mean()
+
+#Calculate ratio reflected (Mean albedo)
+
+reflected = data[valid].mean()  
+
+#absorbed is MeanRadiation/m^2 scaled by 1-ratio reflected
+
+absorbed = Meanrad*(1-reflected)
+
+
+#5 Global total/month
+
+#Sum of Total radiation/month
+
+sumrad = rad.sum(axis=(1,2))
+
+#load list for absorbed rad values
+
+sumabsorbed = []
+
+#loop over sumrad and append absorbed totals
+
+for i,w in enumerate(sumrad):
+    sumabsorbed.append(sumrad[i]*(1-reflected))
+
+nan produced!
