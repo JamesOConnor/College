@@ -1,7 +1,42 @@
-
 #Lewis' function for masked arrays
 
-run expressions/lewis
+import numpy as np
+import numpy.ma as ma
+from netCDF4 import Dataset
+root = 'files/data/'
+year = 2009
+month = 1
+local_file = root + 'GlobAlbedo.%d%02d.mosaic.5.nc'%(year,month)
+nc = Dataset(local_file,'r')
+
+def masked(dataset='BHR_SW',year=2009):
+
+  # which months?
+  months = xrange(1,13)
+
+  # empty list
+  data = []
+
+  # loop over month
+  # use enumerate so we have an index counter
+  for i,month in enumerate(months):
+    # this then is the file we want
+    local_file = root + 'GlobAlbedo.%d%02d.mosaic.5.nc'%(year,month)
+
+    # load the netCDF data from the file local_file
+    nc = Dataset(local_file,'r')
+    # load into the variable 'band'
+    band = np.array(nc.variables[dataset])
+    # convert to a masked array
+    masked_band = ma.array(band,mask=np.isnan(band))
+    # append what we read to the list called data
+    data.append(masked_band)
+
+  # convert data to a numpy array (its a list of arrays at the moment)
+  data = ma.array(data)
+  return data
+
+  
 import masked from masked
 
 #1... Read GlobAlbedo data DHR_SW (shortwave directional-hemispherical reflectance) into a masked array data
@@ -26,8 +61,22 @@ lat2 = np.array([np.array([lat] * data.shape[0]).T] * data.shape[2]).T
 
 #load declination/solar_elevation expressions
 
-run expressions/declination
-run expressions/solar_elevation
+def declination(N):
+    '''Calculate solar declination (in degrees)'''
+    t0 = np.deg2rad (0.98565*(N-2))
+    t1 = 0.39779*np.cos( np.deg2rad ( 0.98565*(N+10) + 1.914*np.sin ( t0 ) ) )
+    delta = -np.arcsin ( t1 )
+    return np.rad2deg(delta)
+
+def solar_elevation(delta,h,lat):
+    '''solar elevation in degrees'''
+    lat = np.deg2rad(lat)
+    delta = np.deg2rad(delta)
+    h = np.deg2rad(h)
+    sin_theta = np.cos (h)*np.cos (delta)*np.cos(lat) + np.sin ( delta)*np.sin(lat)
+    return np.rad2deg(np.arcsin(sin_theta))
+
+#Load rad array
 
 h2 = np.zeros_like(N2) + h
 delta = declination(N2.copy())
