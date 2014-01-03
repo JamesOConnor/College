@@ -1,0 +1,65 @@
+
+from scipy import optimize
+x = dict['TerraDict']['doy']
+y = (dict['TerraDict']['flow']+dict["AquaDict"]["flow"])/2
+
+p = np.zeros(3)
+
+p[1] = 2000         
+p[2] = .95  
+
+def mismatch_function(p, x, y):
+    y_hat = model_accum(dict, p)
+    diff = (y_hat - dict['TerraDict']['flow'])
+    return diff
+
+
+def sse(p,x,y):
+    '''Sum of squared error'''
+    return (mismatch_function(p,x,y)**2).sum()
+
+
+def model_accum(dict, p):
+    meltDays = np.where(dict['TerraDict']['temp'] > p[0])[0]
+    accum = dict['TerraDict']['snowprop']*0.
+    for d in meltDays:
+        water = p[1] * ((dict['TerraDict']['snowprop']+dict["AquaDict"]["snowprop"])/2)[d]
+        n = np.arange(len(dict['TerraDict']['snowprop'])) - d
+        m = p[2] ** n
+        m[np.where(n<0)]=0
+        accum += (m * water)
+    return accum
+
+
+l = []
+k = []
+for t in np.linspace(7,10,50):
+	s = np.array([t,p[1], p[2]])
+	e = sse(s, x, y)
+	l.append(e)
+	k.append(t)
+
+for i,w in enumerate(l):
+    if min(l) == w:
+	print k[i]
+        p[0] = k[i]
+del k
+del l
+
+bound = np.array([(1.,12.),(1000.,3000),(.9,.99)])
+
+
+psolve = optimize.fmin_l_bfgs_b(sse,p,approx_grad=True,iprint=-1,\
+                                args=(x,y),bounds=bound,factr=1e3)
+
+p= psolve[0]
+pdata= psolve[1] # sse
+
+plt.plot(dict['TerraDict']['flow'], "r", label = "Measured flow")
+plt.plot(model_accum(dict,p), "k--", label = "Modelled flow, sse = %.0f"%(sse(p,x,y)))
+plt.legend(loc = "best", prop={"size":12})
+plt.xlabel("Day of year")
+plt.ylabel("River flow (Cubic feet/sec)")
+plt.title("Measured vs. Modelled flow for year 2009")
+
+
