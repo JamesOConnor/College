@@ -56,5 +56,11 @@ psolve = optimize.fmin_l_bfgs_b(sse,p,approx_grad=True,iprint=-1,\
 p= psolve[0]
 pdata= psolve[1] # sse
 
-plt.plot((dict['TerraDict']['flow']+dict["AquaDict"]["flow"])/2, "r")
-plt.plot(model_accum(dict,p), "k--")
+plt.plot(dict['TerraDict']['flow'], "r", label = "Measured flow")
+plt.plot(model_accum(dict,p), "k--", label = "Modelled flow, sse = %.0f"%(sse(p,x,y)))
+plt.legend(loc = "best", prop={"size":12})
+plt.xlabel("Day of year")
+plt.ylabel("River flow (Cubic feet/sec)")
+plt.title("Measured vs. optimized Modelled flow for year 2009")
+
+
