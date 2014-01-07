@@ -1,0 +1,4 @@
+for i in l:
+		ndata = np.insert(data, i+1, np.zeros_like(data[0]),axis=0)
+		masks = np.insert(masks, i+1, np.ones_like(data[0]),axis=0)
+		data = ndata
