@@ -10,8 +10,7 @@ sys.path.insert(0,'files/python')
 from raster_mask import *
 
 def TerraData(year):
-
-#This code is taken directly from
+        #This code is taken directly from
 	#"6a. Assessed Practical"
 	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/#geogg122_local/geogg122//Chapter6a_Practical/Practical.html
 
@@ -47,17 +46,12 @@ def TerraData(year):
 	small_mask = m[minrow:minrow+nrow,mincol:mincol+ncol]
 
 	#This code defines the length of the year, and associates a numpy array for each day in it
-
-	#Taking an example year
-
-
 	#If the year is directly divisible by 4, it is a leap year
 	if year%4 == 0:
 		doy = np.arange(366)+1
 		
 	#If not, it is not
 	else: doy = np.arange(365)+1
-
 
 	#This code is adapted from "7.0 Fire/ENSO teleconnections", reader.py]
 	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter7_ENSO/python/reader.py
@@ -74,7 +68,6 @@ def TerraData(year):
 	nr,nc = small_mask.shape #define nr, nc for the reader below
 
 	#Definition to read files
-
 
 	def reader(hdf,selected_layers):
 		data = {}
@@ -108,12 +101,10 @@ def TerraData(year):
 		for layer in selected_layers[:-1]:
 		   odata[layer] = ma.array(data[layer],mask=qc)
 		#Return the Fractional data and the full mask
-		return odata["Fractional_Snow_Cover"], qc
-	
-	print "Starting reader - Loading masks"
+		return odata["Fractional_Snow_Cover"]
 
 	print "Loading data"
-	data = [reader(f, selected_layers)[0] for f in files]
+	data = [reader(f, selected_layers) for f in files]
 	masks = np.array([data[i].mask for i in xrange(len(data))])
 	print "Reader successful"
 	#Iniatilize a list to check for missing days
@@ -126,17 +117,15 @@ def TerraData(year):
 
 	#For missing days, duplicate preceeding day - Note as error source
 	for i in l:
-		ndata = np.insert(data, i+1, (reader((files[i-1]),selected_layers)[0]+reader((files[i+1]),selected_layers)[0])/2,axis=0)
-		masks = np.insert(masks, i+1, reader((files[i-1]),selected_layers)[1],axis=0)
-		data = ndata
-		print "Day " + str(i-1) + " duplicated!"
+                ndata = np.insert(data, i+1, np.zeros_like(data[0]),axis=0)
+                masks = np.insert(masks, i+1, np.ones_like(data[0]),axis=0)
+                data = ndata
+		print "Day " + str(i) + " missing!"
 
 	#Finally, apply masks to data
 	data = ma.array(data,mask=masks)
 	#The following code is adapted from "5. Function fitting and Interpolation"
 	#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
-
-	#run Scripts/savitzkygolay #Where I had saved the method
 
 	#Import interpolate module
 	from scipy import interpolate
@@ -241,7 +230,6 @@ def TerraData(year):
 
 		#Just the years data are returned
 		return Discharge_data
-	
 
 	def model_accum(dict,tempThresh,k,p):
 	    meltDays = np.where(dict['temp'] > tempThresh)[0]
