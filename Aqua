@@ -16,7 +16,6 @@ def AquaData(year):
 	#"6a. Assessed Practical"
 	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/#geogg122_local/geogg122//Chapter6a_Practical/Practical.html
 
-
 	modis_file = 'files/data/MYD10A1.A2003026.h09v05.005.2008047035848.hdf'
 
 	data_layer = 'MOD_Grid_Snow_500m:Fractional_Snow_Cover'
@@ -27,10 +26,8 @@ def AquaData(year):
 			target_vector_file="files/data/Hydrologic_Units/HUC_Polygons.shp",\
 			attribute_filter=2)
 
-
 	#This code is taken directly from  "5. Function fitting and Interpolation"
 	#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
-
 
 	rowpix,colpix = np.where(m == False)
 
@@ -51,14 +48,12 @@ def AquaData(year):
 
 	#Taking an example year
 
-
 	#If the year is directly divisible by 4, it is a leap year
 	if year%4 == 0:
 		doy = np.arange(366)+1
 		
 	#If not, it is not
 	else: doy = np.arange(365)+1
-
 
 	#This code is adapted from "7.0 Fire/ENSO teleconnections", reader.py]
 	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter7_ENSO/python/reader.py
@@ -75,7 +70,6 @@ def AquaData(year):
 	nr,nc = small_mask.shape #define nr, nc for the reader below
 
 	#Definition to read files
-
 
 	def reader(hdf,selected_layers):
 		data = {}
@@ -110,8 +104,6 @@ def AquaData(year):
 		   odata[layer] = ma.array(data[layer],mask=qc)
 		#Return the Fractional data and the full mask
 		return odata["Fractional_Snow_Cover"], qc
-	
-	print "Starting reader - Loading masks"
 
 	print "Loading data"
 	data = [reader(f, selected_layers)[0] for f in files]
@@ -127,17 +119,15 @@ def AquaData(year):
 
 	#For missing days, duplicate preceeding day - Note as error source
 	for i in l:
-		ndata = np.insert(data, i+1, (reader((files[i-1]),selected_layers)[0]+reader((files[i+1]),selected_layers)[0])/2,axis=0)
-		masks = np.insert(masks, i+1, reader((files[i-1]),selected_layers)[1],axis=0)
-		data = ndata
-		print "Day " + str(i-1) + " duplicated!"
+                ndata = np.insert(data, i+1, np.zeros_like(data[0]),axis=0)
+                masks = np.insert(masks, i+1, np.ones_like(data[0]),axis=0)
+                data = ndata
+		print "Day " + str(i) + " missing!"
 
 	#Finally, apply masks to data
 	data = ma.array(data,mask=masks)
 	#The following code is adapted from "5. Function fitting and Interpolation"
 	#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
-
-	#run Scripts/savitzkygolay #Where I had saved the method
 
 	#Import interpolate module
 	from scipy import interpolate
@@ -264,7 +254,6 @@ def AquaData(year):
 		#Intialize a dictionary...
 	dict = {}
 
-	
 	#And load in our data...
 	dict["doy"] = doy
 	dict["temp"], dict["precip"], dict["snowfall"], dict["snowdepth"] = YearTemp(year)
