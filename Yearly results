@@ -1,0 +1,52 @@
+print np.max(snow)*100
+print np.where(snow==np.max(snow))
+print np.mean(snow)*100
+print np.min(snow)*100
+print np.where(snow==np.min(snow))
+print np.max(dict["TerraDict"]["flow"]) 
+print np.where(dict["TerraDict"]["flow"]==np.max(dict["TerraDict"]["flow"]))
+print np.mean(dict["TerraDict"]["flow"])
+print np.min(dict["TerraDict"]["flow"])
+print np.where(dict["TerraDict"]["flow"]==np.min(dict["TerraDict"]["flow"]))
+print np.max(dict["TerraDict"]["temp"])
+print np.where(dict["TerraDict"]["temp"]==np.max(dict["TerraDict"]["temp"]))
+print np.mean(dict["TerraDict"]["temp"])
+print np.min(dict["TerraDict"]["temp"])
+print np.where(dict["TerraDict"]["temp"]==np.min(dict["TerraDict"]["temp"]))
+
+#2008
+
+86.3934135338 
+(array([54]),) 
+37.1568072641 
+0.436992481203
+(array([179]),) 
+6090 
+(array([141]),) 
+978.114754098
+105
+(array([349]),)
+18.3333333333
+(array([209]),)
+3.38038858531
+-23.0555555556
+(array([17]),)
+
+#2009
+
+83.958075188
+(array([364]),)
+33.740304707
+0.308601503759
+(array([225]),)
+5530
+(array([127]),)
+819.189041096
+140
+(array([343, 344, 361]),)
+18.8888888889
+(array([206]),)
+4.20852359209
+-16.1111111111
+(array([343]),)
+
