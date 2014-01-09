@@ -1,0 +1,68 @@
+#A method for choosing MODIS Fractional snow cover year and data
+
+import os, sys
+sys.path.insert(0, "Scripts/InUse")
+from TerraAll import *
+from AquaAll import *
+from Puller import *
+from glob import glob
+
+def menu():
+    data = {}
+    sensor = raw_input("Would you like to look at - Terra, Aqua or both?").upper()
+    if sensor not in ["TERRA", "AQUA", "BOTH"]:
+        print "I don't understand! Try again!"
+        menu()
+    data["sensor"] = sensor
+    year = raw_input("What year would you like to load? (Note: This user used 2008/2009)")
+    try: year = int(year)
+    except ValueError: menu()
+    data["year"] = year
+    return data
+
+data = menu()
+
+def implotter(year):
+
+	pict = raw_input("What day would you like to view? (1-366)")
+	print pict, year
+	if int(pict) not in dict["doy"]:
+	    print "That's not a day!"
+	    implotter(year)
+	
+	else: 
+		plt.imshow(dict["snowarray"][int(pict)-1])
+		plt.title("Snow cover for day "+str(pict)+" year "+str(year))
+		plt.show()
+	quest=raw_input("Would you like to see another? (Yes/Quit)").upper()
+	if quest == "YES":
+	    implotter(year)
+	elif quest == "QUIT":
+	    return
+	else: 
+	    print "I don't understand!"
+	    implotter(year)
+
+
+if data["sensor"] == "AQUA":
+    try:
+	dict = AquaData(data["year"])
+	initial = raw_input("Would you like to view snow cover for a particular day? (Yes/No)").upper()
+        if initial == "YES":
+        	implotter(data["year"])
+    except IndexError: 
+	option = raw_input("I don't have the files for that year,would you like to download them? (Yes/No)").upper()
+	if option == "YES":
+		print "This will take a while!"
+		Puller(data["year"])
+		menu()
+	else: print "Thanks!"
+elif data["sensor"] == "TERRA":
+    dict = TerraData(data["year"])
+    initial = raw_input("Would you like to view snow cover for a particular day? (Yes/No)").upper()
+    if initial == "YES":
+        implotter(year)
+elif data["sensor"] == "BOTH":
+    Tdict = TerraData(data["year"])
+    Adict = AquaData(data["year"])
+    dict = {"TerraDict" : Tdict, "AquaDict" : Adict}
