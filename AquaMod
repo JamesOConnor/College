@@ -1,0 +1,272 @@
+import numpy as np
+import pylab as plt
+import numpy.ma as ma
+import gdal
+from glob import glob
+import sys,os
+sys.path.insert(0,"Scripts")
+from savitzkygolay import *
+sys.path.insert(0,'files/python')
+from raster_mask import *
+
+
+def AquaData(year):
+
+#This code is taken directly from
+	#"6a. Assessed Practical"
+	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/#geogg122_local/geogg122//Chapter6a_Practical/Practical.html
+
+
+	modis_file = 'files/data/MYD10A1.A2003026.h09v05.005.2008047035848.hdf'
+
+	data_layer = 'MOD_Grid_Snow_500m:Fractional_Snow_Cover'
+
+	fname = 'HDF4_EOS:EOS_GRID:"%s":%s'%(modis_file,data_layer)
+
+	m = raster_mask2(fname,\
+			target_vector_file="files/data/Hydrologic_Units/HUC_Polygons.shp",\
+			attribute_filter=2)
+
+
+	#This code is taken directly from  "5. Function fitting and Interpolation"
+	#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
+
+
+	rowpix,colpix = np.where(m == False)
+
+	mincol,maxcol = min(colpix),max(colpix)
+	minrow,maxrow = min(rowpix),max(rowpix)
+
+	ncol = maxcol - mincol + 1
+	nrow = maxrow - minrow + 1
+
+	xoff = int(mincol)
+	yoff = int(minrow)
+	xsize = ncol and int(ncol)
+	ysize = nrow and int(nrow)
+
+	small_mask = m[minrow:minrow+nrow,mincol:mincol+ncol]
+
+	#This code defines the length of the year, and associates a numpy array for each day in it
+
+	#Taking an example year
+
+
+	#If the year is directly divisible by 4, it is a leap year
+	if year%4 == 0:
+		doy = np.arange(366)+1
+		
+	#If not, it is not
+	else: doy = np.arange(365)+1
+
+
+	#This code is adapted from "7.0 Fire/ENSO teleconnections", reader.py]
+	#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter7_ENSO/python/reader.py
+
+	#This code is modified to direct glob to where are files are, we keep year general
+	files = np.sort(glob('%d_HDFS/MYD10A1.A*.h09v05.005.*.hdf'%(year)))
+
+	selected_layers = ["Fractional_Snow_Cover", "Snow_Spatial_QA"] #the data layer we want
+
+	#Changed this code slightly due to filename differences
+	years = np.array([f.split(os.sep)[-1].split('.')[1][1:5] for f in files]).astype(int)
+	day = np.array([f.split(os.sep)[-1].split('.')[1][5:] for f in files]).astype(int)
+
+	nr,nc = small_mask.shape #define nr, nc for the reader below
+
+	#Definition to read files
+
+
+	def reader(hdf,selected_layers):
+		data = {}
+		#Put a counter in
+	        check = int(f.split(os.sep)[-1].split(".")[1][5:])
+		if check%37 == 0:
+        		print str(int(float(check)/float(len(files))*100)) +"% read!"
+
+		#Changed the file template for our file format
+		file_template = 'HDF4_EOS:EOS_GRID:"%s":MOD_Grid_Snow_500m:%s'
+		for layer in selected_layers:	
+			this_file = file_template % ( hdf, layer )
+			g = gdal.Open(this_file)
+			#Reading only the data for the catchment in the mask
+			data[layer] = g.ReadAsArray(xoff,yoff,xsize,ysize)
+
+		qc = data["Snow_Spatial_QA"] # Get the QC data
+
+		#Mask through QA layer, mask
+		qc = qc | small_mask
+	    
+		odata = {}
+		for layer in selected_layers[:-1]:
+		   odata[layer] = ma.array(data[layer],mask=qc)
+		#Return the Fractional data and the full mask
+		odata[layer] = ma.masked_greater(odata[layer], 100) 
+		return odata["Fractional_Snow_Cover"]
+	
+	print "Starting reader - Loading masks"
+
+	print "Loading data"
+	data = [reader(f, selected_layers) for f in files]
+	masks = np.array([data[i].mask for i in xrange(len(data))])
+	print "Reader successful"
+	#Iniatilize a list to check for missing days
+	l = []
+
+	#Loop over doy and compare to day to check for missing days, append if missing
+	for i in doy:
+	    if i not in day:
+		l.append(i)
+
+	#For missing days, duplicate preceeding day - Note as error source
+	for i in l:
+                ndata = np.insert(data, i+1, np.zeros_like(data[0]),axis=0)
+                masks = np.insert(masks, i+1, np.ones_like(data[0]),axis=0)
+                data = ndata
+		print "Day " + str(i) + " missing!"
+
+	#Finally, apply masks to data
+	data = ma.array(data,mask=masks)
+	#The following code is adapted from "5. Function fitting and Interpolation"
+	#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
+
+	#run Scripts/savitzkygolay #Where I had saved the method
+
+	#Import interpolate module
+	from scipy import interpolate
+
+	#Parameters for interpolation
+	window_size = 31
+	order = 1
+
+	#Initialize a new dataset for interpolation
+	intdata = np.zeros_like(data)
+
+	# Take the linear interpolation of each pixel as a signal
+	# and interpolate using savitzky_golay interpolation
+
+	print "Interpolating..."
+	for r in xrange(nr):
+		if r%14==0: print str(int(100*(float(r)/float(nr)))) + "%"
+		for c in xrange(nc):
+			pixel = data[:,r,c]
+			#Check to see if any values exist
+			if False in pixel.mask:
+				#Execute - Code largely taken Lewis exercise with superficial changes
+				y_ = pixel[~pixel.mask]
+				x_ = doy[~pixel.mask]
+				y_extend = np.tile(y_,3)
+				x_extend = np.hstack((x_-len(doy),x_,x_+len(doy)))
+				f = interpolate.interp1d(x_extend,y_extend,kind='linear')
+				y = f(doy)
+				z = savitzky_golay(y,window_size,order)
+				intdata[:,r,c] = z
+	print "Interpolation complete"
+
+	#Generate a list and array of Snow %
+	snow = [intdata[i].mean() for i in (doy-1)]
+	snow = np.array(snow)
+
+	#.. and Snow free %
+	snowfree = np.absolute(100-snow)
+
+	#Method for loading Temperature data
+
+	def YearTemp(year):
+		
+		#make sure numpy in imported
+		import numpy as np
+
+		#Unload Temperature data using np.loadtxt, the option skiprows lets us skip rows we don't need
+		Tdata = np.loadtxt("files/data/delNorteT.dat",unpack=True,skiprows=2)
+		precip = Tdata[5][np.where(Tdata[0]==year)]
+		snowfall = Tdata[6][np.where(Tdata[0]==year)]
+		snowdepth = Tdata[7][np.where(Tdata[0]==year)]
+		
+		loop = [precip,snowfall,snowdepth]
+		for i in loop:
+			for q,w in enumerate(i):
+				if w > 1000:
+					i[q] = 0
+		#Load Min/Max for year 2002
+
+		#Max column will be at index where the year ###column is the year in question, as with min
+		Max = Tdata[3][np.where(Tdata[0]==year)]
+		Min = Tdata[4][np.where(Tdata[0]==year)]
+		#Take a simple Mean for the average
+		Mean = (Max+Min)/2
+
+
+		#Check for broken values - flagged as high temps
+		for i,w in enumerate(Mean):
+			if w > 100:
+			#If bad, take a 5 day median backweighted incase of many broken values in a row
+				Mean[i] = np.median(Mean[i-3:i+2])
+
+		#Convert to Celcius
+		#Formula take from http://www.manuelsweb.com/temp.htm
+		Celc = (Mean-32.)*(5./9.)
+
+		#Return processed Temperature data
+		return Celc, precip, snowfall, snowdepth
+
+
+	#Here we develop a method to extract the discharge data
+	def DisData(year):
+
+		#make sure numpy is imported
+		import numpy as np
+		
+		#Discharge data unpacked as using numpy - usecols lets us extract just
+		#dates and discharge data - dtype specified to avoid reading error
+		Ddata = np.loadtxt('files/data/delnorte.dat',usecols=(2,3),unpack=True,dtype=str)
+
+		#Start and end of year will always be the same date
+		Start = "%d-01-01"%(year)
+		End = "%d-12-31"%(year)
+
+		#Find index of start and end
+		startindex = np.where(Ddata[0]==Start)
+		endindex = np.where(Ddata[0]==End)
+
+		#Load 2nd column data from startindex to endindex + 1 - +1 is needed as
+		#indices are read excluding the last number
+		Discharge_data = Ddata[1][startindex[0][0]:endindex[0][0]+1].astype(int)
+
+		#Just the years data are returned
+		return Discharge_data
+	
+
+	def model_accum(dict,tempThresh,k,p):
+	    meltDays = np.where(dict['temp'] > tempThresh)[0]
+	    accum = dict['snowcover%']*0.
+	    for d in meltDays:
+		water = k * dict['snowcover%'][d]
+		n = np.arange(len(dict['snowcover%'])) - d
+		m = p ** n
+		m[np.where(n<0)]=0
+		accum += m * water
+	    return accum
+
+
+	tempThresh = 8.5
+	k = 2000.0
+	p = 0.95
+	
+	print 'dict start'
+		#Intialize a dictionary...
+	dict = {}
+
+	
+	#And load in our data...
+	dict["doy"] = doy
+	dict["temp"], dict["precip"], dict["snowfall"], dict["snowdepth"] = YearTemp(year)
+	dict["flow"] = DisData(year)
+	dict["snowcover%"] = np.array(snow)
+	dict["snowprop"] = np.array(snow)/100
+	dict["snowarray"] = intdata
+	dict["rawsnowarray"] = data
+	dict["model"] = model_accum(dict, tempThresh,k,p)/100
+	print("Your data has been loaded into a dictionary 'dict', use dict.keys() to explore")
+	return dict
+
