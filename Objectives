@@ -1,0 +1,12 @@
+In [54]: np.max(np.diff(flow))
+Out[54]: 1060
+
+In [55]: np.min(np.diff(flow))
+Out[55]: -990
+
+In [48]: np.where(np.absolute(np.diff(flow))>300)[0][0]
+Out[48]: 119
+
+In [49]: temp[119]
+Out[49]: 7.7777777777777786
+
