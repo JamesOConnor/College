@@ -1,0 +1,486 @@
+#The following is adapted from "Getting MODIS urls" by P. Lewis
+#http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/
+ Chapter4_GDAL/advanced.html#A4.1.-Getting-MODIS-URLs
+
+import numpy as np #make sure numpy,urllib2 are imported
+import urllib2
+import os #for making directory
+
+year = '2008' #the year we want
+tile = 'h09v05' #tile containing catchment
+
+# base URL for the products
+url_base_Aqua = 'ftp://n4ftl01u.ecs.nasa.gov/MOSA/MYD10A1.005' 
+url_base_Terra = 'ftp://n4ftl01u.ecs.nasa.gov/MOST/MOD10A1.005'
+
+bases = [url_base_Aqua, url_base_Terra]
+
+directory = "files/data/%s_HDFS"%(year)
+#clever check from http://stackoverflow.com/a/273227
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+filepath = "files/data/hdf_files.txt"
+
+for url_base in bases:
+    response = urllib2.urlopen(url_base) #open and readlines
+    html = response.read()
+
+    k = html.split("\n")[1:-1]
+
+    #identify the dates of the files
+    dirs = np.array([k[i].strip().split(" ")[-1] for i,w in enumerate(k)])
+
+    # identify years
+    years = np.array([i.split('.')[0] for i in dirs])
+    # year mask
+    mask = (year == years)
+    sub_dirs = dirs[mask] #apply mask
+
+
+    #Identify files and append to empty list hdf_files
+    hdf_files = []
+
+    for this_date in sub_dirs:
+        url_date = url_base + '/' + this_date
+        response1 = urllib2.urlopen(url_date)
+        html1 = response1.read()
+        hdf_lines = [i for i in [line for line in html1.split('\n') \
+                             if tile in line] if i.split(".")[-1] == "hdf\r"]
+        if hdf_lines == []: #Incase of missing data, continue through
+            continue
+        else:
+            hdf_file = url_date + '/' + hdf_lines[0].split(' ')[-1].strip()
+            hdf_files.append(hdf_file+'\n')
+
+    f = open(filepath,'w') #write to a .txt file in case of crash
+    f.writelines(hdf_files)
+    f.close()
+
+    for url in hdf_files:
+        url = url.strip()
+        response = urllib2.urlopen(url.strip())
+        ofile = "2008_HDFS/" + url.split('/')[-1]
+        f = open(ofile,'w')
+        f.write(response.read())
+        f.close()
+
+
+import pylab as plt
+import numpy.ma as ma
+import gdal
+from glob import glob
+import sys
+import os
+sys.path.insert(0,"Scripts") #Where savitzkygolay is located
+from savitzkygolay import *
+sys.path.insert(0,'files/python') #Where the raster_mask is located
+from raster_mask import *
+
+#This code is taken directly from "6a. Assessed Practical"
+#by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/#geogg122_local/
+             geogg122//Chapter6a_Practical/Practical.html
+
+
+modis_file = 'files/data/MYD10A1.A2003026.h09v05.005.2008047035848.hdf'
+
+data_layer = 'MOD_Grid_Snow_500m:Fractional_Snow_Cover' 
+
+fname = 'HDF4_EOS:EOS_GRID:"%s":%s'%(modis_file,data_layer)
+
+m = raster_mask2(fname,\
+        target_vector_file="files/data/Hydrologic_Units/HUC_Polygons.shp",\
+        attribute_filter=2)
+
+#This code is taken directly from "Function fitting and Interpolation"
+#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/
+            Chapter5_Interpolation/Interpolation.html
+
+rowpix,colpix = np.where(m == False)
+
+mincol,maxcol = min(colpix),max(colpix)
+minrow,maxrow = min(rowpix),max(rowpix)
+
+ncol = maxcol - mincol + 1
+nrow = maxrow - minrow + 1
+
+xoff = int(mincol)
+yoff = int(minrow)
+xsize = ncol and int(ncol)
+ysize = nrow and int(nrow)
+
+small_mask = m[minrow:minrow+nrow,mincol:mincol+ncol]
+
+year = 2008 #example year
+
+#This code defines the length of the year
+#If the year is directly divisible by 4, it is a leap year
+
+if year%4 == 0:
+    doy = np.arange(366)+1
+    
+#If not, it is not
+
+else: doy = np.arange(365)+1
+
+#This code is adapted from "7.0 Fire/ENSO teleconnections", reader.py
+#by P. Lewis #http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/
+              geogg122/Chapter7_ENSO/python/reader.py
+
+#This line is modified to direct glob to where our files are
+files = np.sort(glob('files/data/%d_HDFS/MOD10A1.A*.h09v05.005.*.hdf'%(year)))
+
+#the data layer we want with QA
+selected_layers = ["Fractional_Snow_Cover", "Snow_Spatial_QA"]
+
+#Changed this code slightly due to filename differences
+years = np.array([f.split(os.sep)[-1].split('.')[1][1:5] \
+                  for f in files]).astype(int)
+day = np.array([f.split(os.sep)[-1].split('.')[1][5:] \ 
+                for f in files]).astype(int)
+
+nr,nc = small_mask.shape #define nr, nc for the reader below
+
+
+#Definition to read files
+def reader(hdf,selected_layers):
+    data = {}
+    #Put a counter in
+    check = int(f.split(os.sep)[-1].split(".")[1][5:])
+    if check%37 == 0:
+        print str(int(float(check)/float(len(files))*100)) +"% read!"
+
+    #Changed the file template for our file format
+    file_template = 'HDF4_EOS:EOS_GRID:"%s":MOD_Grid_Snow_500m:%s'
+    for layer in selected_layers:   
+        this_file = file_template % ( hdf, layer )
+        g = gdal.Open(this_file)
+        #Reading only the data for the catchment in the mask
+        data[layer] = g.ReadAsArray(xoff,yoff,xsize,ysize)
+
+    qc = data["Snow_Spatial_QA"] # Get the QC data
+
+    #Mask through QA layer and raster mask
+    qc = qc | small_mask
+    
+    odata = {}
+    for layer in selected_layers[:-1]:
+       odata[layer] = ma.array(data[layer],mask=qc)
+    #Return the masked Fractional data
+    return odata["Fractional_Snow_Cover"]
+
+print "Loading data"
+data = [reader(f, selected_layers) for f in files]
+masks = np.array([data[i].mask for i in xrange(len(data))])
+print "Reader successful"
+
+#Initialize a list to check for missing days
+l = []
+
+#Loop over doy and compare to day to check for missing days
+for i in doy:
+    if i not in day:
+        l.append(i) #append if missing
+
+#For missing days we enter an empty day prior to interpolating - Note as error source
+for i in l:                
+    ndata = np.insert(data,i+1, np.zeros_like(data[0]),axis=0)#Make empty day             
+    masks = np.insert(masks, i+1, np.ones_like(data[0]),axis=0) #1==True              
+    data = ndata
+
+#Apply masks to data
+data = ma.array(data,mask=masks)
+#Finally, as just snow and cloud is left in the array,
+#we mask cloud prior to interpolation
+data = ma.masked_greater(data, 100)
+
+#The following code is adapted from "5. Function fitting and Interpolation"
+#by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/Chapter5_Interpolation/Interpolation.html
+
+#run Scripts/savitzkygolay #Where I had saved the method
+
+#Import interpolate module
+from scipy import interpolate
+
+#Parameters for interpolation
+window_size = 31
+order = 1
+
+#Initialize a new dataset for interpolation
+intdata = np.zeros_like(data)
+
+# Take the linear interpolation of each pixel as a signal
+# and interpolate using savitzky_golay interpolation
+
+print "Interpolating..."
+for r in xrange(nr):
+    if r%14==0: print str(int(100*(float(r)/float(nr)))) + "%"
+    for c in xrange(nc):
+        pixel = data[:,r,c]
+        # Code largely taken Lewis exercise with small changes
+        y_ = pixel[~pixel.mask]
+        x_ = doy[~pixel.mask]
+        y_extend = np.tile(y_,3)
+        x_extend = np.hstack((x_-len(doy),x_,x_+len(doy)))
+        f = interpolate.interp1d(x_extend,y_extend,kind='linear')
+        y = f(doy)
+        z = savitzky_golay(y,window_size,order)
+        intdata[:,r,c] = z
+print "Interpolation complete"
+
+#Generate a list and array of mean Snow % per day
+snow = [intdata[i].mean() for i in (doy-1)] 
+snow = np.array(snow)
+
+#.. and Snow free %
+snowfree = np.absolute(100-snow)
+
+#Method for loading Temperature data
+
+def YearTemp(year):
+    
+    #make sure numpy is imported
+    import numpy as np
+
+    #Unload Temperature data using np.loadtxt, the option skiprows 
+      lets us skip rows we don't need
+    Tdata = np.loadtxt("files/data/delNorteT.dat",unpack=True,skiprows=2)
+
+    #Max column will be at index where the year column is 
+     the year in question, as with min
+    Max = Tdata[3][np.where(Tdata[0]==year)]
+    Min = Tdata[4][np.where(Tdata[0]==year)]
+    #Take a simple Mean for the average
+    Mean = (Max+Min)/2
+
+
+    #Check for broken values - flagged as high temps
+    for i,w in enumerate(Mean):
+        if w > 100:
+        #If bad, take a 5 day median back weighted in case of 
+  #many broken values in a row
+            Mean[i] = np.median(Mean[i-3:i+2])
+
+    #Convert to Celcius
+    #Formula take from http://www.manuelsweb.com/temp.htm
+    Celc = (Mean-32.)*(5./9.)
+
+    #Return processed Temperature data
+    return Celc
+
+	#Here we develop a method to extract the discharge data
+def DisData(year):
+
+    #make sure numpy is imported
+    import numpy as np
+    
+    #Discharge data unpacked as using numpy - usecols lets us extract just
+    #dates and discharge data - dtype specified to avoid reading error
+    Ddata = np.loadtxt('files/data/delnorte.dat',usecols=(2,3),unpack=True,dtype=str)
+
+    #Start and end of year will always be the same date
+    Start = "%d-01-01"%(year)
+    End = "%d-12-31"%(year)
+
+
+
+    #Find index of start and end
+    startindex = np.where(Ddata[0]==Start)
+    endindex = np.where(Ddata[0]==End)
+
+    #Load 2nd column data from startindex to endindex. +1 is needed as
+    #indices are read excluding the last number
+    Discharge_data = Ddata[1][startindex[0][0]:endindex[0][0]+1].astype(int)
+
+    #Just the years data are returned
+    return Discharge_data
+
+	#Initialize a dictionary...
+TerraDict = {}
+
+#And load in our data...
+TerraDict["doy"] = doy 
+TerraDict["temp"] = YearTemp(year)
+TerraDict["flow"] = DisData(year)
+TerraDict["snowcover%"] = snow
+TerraDict["snowprop"] = snow/100
+TerraDict["snowarray"] = intdata
+TerraDict["rawsnowarray"] = data
+TerraDict["snowfree%"] = snowfree
+
+###########################################################################
+###########################################################################
+
+snow = (dict['TerraDict']['snowprop'] + dict[‘AquaDict’][‘snowprop’])/2)
+#The following code is taken directly from “6a. Assessed Practical” by Prof Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122//Chapter6a_Practical/Practical.html
+
+def model_accum(dict,tempThresh,k,p):
+    meltDays = np.where(dict['TerraDict']['temp'] > tempThresh)[0]
+    accum = dict['snowprop']*0.
+    for d in meltDays:
+    	water = k * snow[d]
+    	n = np.arange(len(dict['snowprop'])) - d
+    	m = p ** n
+    	m[np.where(n<0)]=0
+    	accum += m * water
+    return accum
+tempThresh = 8.5
+k = 2000.0
+p = 0.95
+
+accum = model_accum(dict, tempThresh,k,p)
+
+#The following code is adapted from “6a. Assessed Practical” by Prof Lewis #http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/
+ geogg122//Chapter6a_Practical/Practical.html
+
+x = dict['TerraDict']['doy'] 
+y = dict['TerraDict']['flow']
+
+def mismatch_function(p, x, y):
+    y_hat = model_accum(dict, p)
+    diff = y_hat - snow
+    return diff
+
+
+def sse(p,x,y):
+    '''Sum of squared error'''
+    return mismatch_function(p,x,y)**2.sum()
+
+def rmse(p,x,y):
+    return np.sqrt((sse(p,x,y))/x.size)
+
+p = np.zeros(3)
+p[0],p[1],p[2] = 8.5, 2000, .95
+
+p = np.zeros(3)
+
+p[1] = 2000         
+p[2] = .95  
+
+l = []
+k = []
+for t in np.linspace(7,10,50):
+    s = np.array([t,p[1], p[2]])
+    e = sse(s, x, y)
+    l.append(e)
+    k.append(t)
+
+for i,w in enumerate(l):
+if min(l) == w:
+    p[0] = k[i]
+
+bound = np.array([(1.,12.),(1000.,3000),(.9,.99)]) #set bounds
+
+from scipy import optimize #make sure optimize imported
+psolve = optimize.fmin_l_bfgs_b(rmse,p,approx_grad=True,iprint=-1,\
+                                args=(x,y),bounds=bound,factr=1e3)
+p= psolve[0]
+pdata= psolve[1] # rmse
+
+p = np.zeros(4) #add a parameter
+
+p[1] = 2000         
+p[2] = .95  
+p[3] = 150 # define initial guess
+
+def model_accum(dict, p):
+    meltDays = np.where(dict['TerraDict']['temp'] > p[0])[0]
+    accum = dict['TerraDict']['snowprop']*0.
+    for d in meltDays:
+        water = p[1] * snow
+        n = np.arange(len(dict['TerraDict']['snowprop'])) - d
+        m = p[2] ** n
+        m[np.where(n<0)]=0
+        accum += (m * water)
+    return accum + p[3] #add baseflow for each day
+
+bound = np.array([(1.,12.),(1000.,3000),(.9,.99), (0., 300.)]) #bound it
+
+
+###########################################################################
+###########################################################################
+
+import os, sys
+sys.path.insert(0, "Scripts/InUse")
+#Method for loading TERRA data using, TerraData(year), compiled from the code detailed in the above assignment
+from TerraAll import * 
+from AquaAll import * #Method for loading AQUA data, AquaData(year)
+from Puller import * #Method for downloading files, Puller(year)
+from glob import glob
+
+def implotter():
+    pict = raw_input("What day would you like to view? ('Quit' to move on)")
+    if pict == "Quit":
+        return
+    elif int(pict) not in dict["doy"]:
+        print "That's not a day!"
+        implotter()
+    else: 
+        plt.imshow(dict["snowarray"][int(pict)])
+        plt.show()
+
+    quest=raw_input("Would you like to see another? (Yes/Quit)")
+    if quest == "Yes":
+        implotter()
+    elif quest == "Quit":
+        return
+    else: 
+        print "I don't understand!"
+        implotter()
+def menu():
+    data = {}
+    sensor = raw_input("Would you like to look at - Terra, Aqua or both?").upper()
+    if sensor not in ["TERRA", "AQUA", "BOTH"]:
+        print "I don't understand! Try again!"
+        menu()
+    data["sensor"] = sensor
+    year = raw_input("What year would you like to load? (Note: This user used 2008/2009)")
+    try: year = int(year)
+    except ValueError: menu()
+    data["year"] = year
+    return data
+
+data = menu()
+
+if data["sensor"] == "AQUA":
+    try:
+    dict = AquaData(data["year"])
+    except IndexError: 
+        option = raw_input("I don't have the files for that year,would you like to download them? (Yes/No)").upper()
+        if option == "YES":
+            print "This will take a while!"
+            Puller(data["year"])
+            menu()
+        else: print "Ending"
+    initial = raw_input("Would you like to view snow cover for a particular day? (Yes/No)").upper()
+    if initial == "YES":
+        implotter(data["year"])
+        
+elif data["sensor"] == "TERRA":
+    try:
+    dict = TerraData(data["year"])
+    initial = raw_input("Would you like to view snow cover for a particular day? (Yes/No)").upper()
+        if initial == "YES":
+            implotter(data["year"])
+    except IndexError: 
+    option = raw_input("I don't have the files for that year,would you like to download them? (Yes/No)").upper()
+    if option == "YES":
+        print "This will take a while!"
+        Puller(data["year"])
+        menu()
+        
+if data["sensor"] == "BOTH":
+    try:
+    AquaDict = AquaData(data["year"])
+    except IndexError: 
+        option = raw_input("I don't have the files for that year,would you like to download them? (Yes/No)").upper()
+        if option == "YES":
+            print "This will take a while!"
+            Puller(data["year"])
+            menu()
+        else: print "Ending"
+    initial = raw_input("Would you like to view snow cover for a particular day? (Yes/No)").upper()
+    if initial == "YES":
+        implotter(data["year"])
+    TerraDict = TerraData(data["year"])
+    dict = {"TerraDict" : Tdict, "AquaDict" : Adict}
