@@ -79,7 +79,7 @@ from raster_mask import *
 
 #This code is taken directly from "6a. Assessed Practical"
 #by P. Lewis http://www2.geog.ucl.ac.uk/~plewis/#geogg122_local/
-             geogg122//Chapter6a_Practical/Practical.html
+             #geogg122//Chapter6a_Practical/Practical.html
 
 
 modis_file = 'files/data/MYD10A1.A2003026.h09v05.005.2008047035848.hdf'
@@ -94,7 +94,7 @@ m = raster_mask2(fname,\
 
 #This code is taken directly from "Function fitting and Interpolation"
 #by P.Lewis http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/
-            Chapter5_Interpolation/Interpolation.html
+            #Chapter5_Interpolation/Interpolation.html
 
 rowpix,colpix = np.where(m == False)
 
@@ -125,7 +125,7 @@ else: doy = np.arange(365)+1
 
 #This code is adapted from "7.0 Fire/ENSO teleconnections", reader.py
 #by P. Lewis #http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/
-              geogg122/Chapter7_ENSO/python/reader.py
+              #geogg122/Chapter7_ENSO/python/reader.py
 
 #This line is modified to direct glob to where our files are
 files = np.sort(glob('files/data/%d_HDFS/MOD10A1.A*.h09v05.005.*.hdf'%(year)))
@@ -136,8 +136,7 @@ selected_layers = ["Fractional_Snow_Cover", "Snow_Spatial_QA"]
 #Changed this code slightly due to filename differences
 years = np.array([f.split(os.sep)[-1].split('.')[1][1:5] \
                   for f in files]).astype(int)
-day = np.array([f.split(os.sep)[-1].split('.')[1][5:] \ 
-                for f in files]).astype(int)
+day = np.array([f.split(os.sep)[-1].split('.')[1][5:] for f in files]).astype(int)
 
 nr,nc = small_mask.shape #define nr, nc for the reader below
 
@@ -243,11 +242,11 @@ def YearTemp(year):
     import numpy as np
 
     #Unload Temperature data using np.loadtxt, the option skiprows 
-      lets us skip rows we don't need
+    #lets us skip rows we don't need
     Tdata = np.loadtxt("files/data/delNorteT.dat",unpack=True,skiprows=2)
 
     #Max column will be at index where the year column is 
-     the year in question, as with min
+    #the year in question, as with min
     Max = Tdata[3][np.where(Tdata[0]==year)]
     Min = Tdata[4][np.where(Tdata[0]==year)]
     #Take a simple Mean for the average
