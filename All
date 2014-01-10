@@ -1,6 +1,6 @@
 #The following is adapted from "Getting MODIS urls" by P. Lewis
 #http://www2.geog.ucl.ac.uk/~plewis/geogg122_local/geogg122/
- Chapter4_GDAL/advanced.html#A4.1.-Getting-MODIS-URLs
+#Chapter4_GDAL/advanced.html#A4.1.-Getting-MODIS-URLs
 
 import numpy as np #make sure numpy,urllib2 are imported
 import urllib2
