@@ -60,7 +60,7 @@ for url_base in bases:
     for url in hdf_files:
         url = url.strip()
         response = urllib2.urlopen(url.strip())
-        ofile = "2008_HDFS/" + url.split('/')[-1]
+        ofile = "files/data/%s_HDFS/"%(year) + url.split('/')[-1]
         f = open(ofile,'w')
         f.write(response.read())
         f.close()
