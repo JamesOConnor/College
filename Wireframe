@@ -1,0 +1,29 @@
+import pylab as plt
+import cv2
+import numpy as np
+import numpy.ma as ma
+
+x = cv2.imread('IMG_1135.JPG')
+y = cv2.cvtColor(x,cv2.COLOR_BGR2GRAY)
+
+
+xx = np.zeros_like(y)
+yy = np.zeros_like(y)
+rows,columns = y.shape
+
+for r in xrange(rows):
+        for c in xrange(columns):
+                        if r in [0,3167,3168]:
+                                xx[r,c]=0
+                        else:
+                                xx[r,c]=y[r,c]-y[r+1,c]
+for r in xrange(rows):
+        for c in xrange(columns):
+                        if c in [0,4751,4752]:
+                                yy[r,c]=0
+                        else:
+                                yy[r,c]=y[r,c]-y[r,c+1]
+u=xx+yy
+thresh=50
+im_bw = cv2.threshold(u,thresh,255,cv2.THRESH_BINARY)[1]
+plt.imshow(im_bw,cmap='gray')
