@@ -1,9 +1,11 @@
+import Tkinter, tkFileDialog
 import pylab as plt
 import cv2
 import numpy as np
 import numpy.ma as ma
 
-x = cv2.imread('IMG_1135.JPG')
+file = tkFileDialog.askopenfilename()
+x=cv2.imread(file)
 y = cv2.cvtColor(x,cv2.COLOR_BGR2GRAY)
 
 
@@ -13,13 +15,13 @@ rows,columns = y.shape
 
 for r in xrange(rows):
         for c in xrange(columns):
-                        if r in [0,3167,3168]:
+                        if r in [0,rows-1,rows]:
                                 xx[r,c]=0
                         else:
                                 xx[r,c]=y[r,c]-y[r+1,c]
 for r in xrange(rows):
         for c in xrange(columns):
-                        if c in [0,4751,4752]:
+                        if c in [0,columns,columns-1]:
                                 yy[r,c]=0
                         else:
                                 yy[r,c]=y[r,c]-y[r,c+1]
