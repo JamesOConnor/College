@@ -2,7 +2,6 @@ import Tkinter, tkFileDialog
 import pylab as plt
 import cv2
 import numpy as np
-import numpy.ma as ma
 
 file = tkFileDialog.askopenfilename()
 x=cv2.imread(file)
@@ -26,6 +25,5 @@ for r in xrange(rows):
                         else:
                                 yy[r,c]=y[r,c]-y[r,c+1]
 u=xx+yy
-thresh=50
-im_bw = cv2.threshold(u,thresh,255,cv2.THRESH_BINARY)[1]
+im_bw = cv2.threshold(u,50,255,cv2.THRESH_BINARY)[1]
 plt.imshow(im_bw,cmap='gray')
