@@ -5,8 +5,8 @@ import numpy as np
 
 file = tkFileDialog.askopenfilename()
 x=cv2.imread(file)
-y = cv2.cvtColor(x,cv2.COLOR_BGR2GRAY)
-
+z = cv2.cvtColor(x,cv2.COLOR_BGR2GRAY)
+y = cv2.GaussianBlur(z, (21,21), 0)
 
 xx = np.zeros_like(y)
 yy = np.zeros_like(y)
