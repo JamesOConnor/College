@@ -18,7 +18,8 @@ print """
 """
 
 form = cgi.FieldStorage()
-message1 = form.getvalue("imgL", "(no message)")
+imgL = form.getvalue("imgL", "(no message)")
+imgR = form.getvalue("imgR", "(no message)")
 
 print """
 
@@ -27,7 +28,10 @@ print """
   <p>form
 
   <form method="post" action="index.cgi">
-    <p>imgL: <input type="text" name="imgL"/></p>
+    <div>imgL: <input type="text" name="imgL"/></div>
+	<div>imgR: <input type="text" name="imgR"/></div>
+	<div><input type="submit" value="GO!"/></div>
+
   </form>
 
 </body>
@@ -37,29 +41,22 @@ print """
 
 
 
-if message1.split('.')[-1] =="png":
+if imgL.split('.')[-1] =="png":
 	import numpy as np
 	import cv2
 	from skimage import io
 	from PIL import Image
 	import os
 	ims=[]
-	ims.append(io.imread(message1))
-	ims.append(io.imread(message1.replace("im0", "im1")))
-
-	'''
-	Simple example of stereo image matching and point cloud generation.
-
-	Resulting .ply file cam be easily viewed using MeshLab ( http://meshlab.sourceforge.net/ )
-	'''
-
+	ims.append(io.imread(imgL))
+	ims.append(io.imread(imgR))
 	y=os.getcwd()
 	print y
 	Image.fromarray(ims[0]).save("imgs/ImgL.jpeg")
 	Image.fromarray(ims[1]).save("imgs/ImgR.jpeg")
 
-	imgL = cv2.pyrDown( cv2.imread('imgs/ImgL.jpeg') )
-	imgR = cv2.pyrDown( cv2.imread('imgs/ImgR.jpeg') )
+	imgL = cv2.imread('imgs/ImgL.jpeg')
+	imgR = cv2.imread('imgs/ImgR.jpeg') 
 
 	window_size = 3
 	min_disp = 16
@@ -78,9 +75,11 @@ if message1.split('.')[-1] =="png":
 
 	disp = stereo.compute(imgL, imgR).astype(np.float32) / 16.0
 	Image.fromarray((disp-min_disp)/num_disp).save("imgs/res.tiff")
-	cmd="convert imgs/res.tiff imgs/res.png"
+	cmd="convert imgs/res.tiff imgs/res.png; del imgs\res.tiff; del imgs\*.jpg"
 	os.system(cmd)
 
 	print "Content-Type: text/html;charset=utf-8"
 	print
 	print "<html><img src='imgs/res.png'></html>"
+	
+	
