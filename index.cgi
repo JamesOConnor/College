@@ -41,22 +41,15 @@ print """
 
 
 
-if imgL.split('.')[-1] =="png":
+if imgL.split('.')[-1] in ['png', 'jpg', 'jpeg']:
 	import numpy as np
 	import cv2
 	from skimage import io
 	from PIL import Image
 	import os
 	ims=[]
-	ims.append(io.imread(imgL))
-	ims.append(io.imread(imgR))
-	y=os.getcwd()
-	print y
-	Image.fromarray(ims[0]).save("imgs/ImgL.jpeg")
-	Image.fromarray(ims[1]).save("imgs/ImgR.jpeg")
-
-	imgL = cv2.imread('imgs/ImgL.jpeg')
-	imgR = cv2.imread('imgs/ImgR.jpeg') 
+	imgL=io.imread(imgL)
+	imgR=io.imread(imgR)
 
 	window_size = 3
 	min_disp = 16
@@ -75,11 +68,9 @@ if imgL.split('.')[-1] =="png":
 
 	disp = stereo.compute(imgL, imgR).astype(np.float32) / 16.0
 	Image.fromarray((disp-min_disp)/num_disp).save("imgs/res.tiff")
-	cmd="convert imgs/res.tiff imgs/res.png; del imgs\res.tiff; del imgs\*.jpg"
+	cmd="convert imgs/res.tiff imgs/res.png"
 	os.system(cmd)
 
-	print "Content-Type: text/html;charset=utf-8"
-	print
 	print "<html><img src='imgs/res.png'></html>"
 	
 	
