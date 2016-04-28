@@ -1,0 +1,16 @@
+import seaborn as sns
+from matplotlib.patches import Circle
+import numpy as np
+
+def plot_airy(fstop, sensor_width, pixels_in_row):
+    airy=1.22*fstop*.000000550*2
+    fig=sns.plt.figure(figsize=(12,12))
+    ax=fig.add_subplot(1,1,1)
+    p_size=sensor_width/pixels_in_row
+    radius=airy/p_size
+    circ=sns.plt.Circle((2.5,2.5), radius=radius/2, color='y', alpha=0.5)
+    ax.add_patch(circ)
+    sns.plt.title('Pixel size=%s $\mu$m, F-number=%s'%(np.around(p_size*1000000,3),fstop), fontsize=20)
+    sns.plt.xlim(0,5);sns.plt.ylim(0,5)
+    sns.plt.xticks(range(5));sns.plt.yticks(range(5))
+    sns.plt.show()
